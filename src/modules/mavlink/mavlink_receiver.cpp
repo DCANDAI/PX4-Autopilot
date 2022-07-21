@@ -956,29 +956,30 @@ MavlinkReceiver::handle_message_att_pos_mocap(mavlink_message_t *msg)
 	mocap_odom.timestamp = hrt_absolute_time();
 	mocap_odom.timestamp_sample = _mavlink_timesync.sync_stamp(mocap.time_usec);
 
-	mocap_odom.x = mocap.x;
-	mocap_odom.y = mocap.y;
-	mocap_odom.z = mocap.z;
+	mocap_odom.position[0] = mocap.x;
+	mocap_odom.position[0] = mocap.y;
+	mocap_odom.position[0] = mocap.z;
+
 	mocap_odom.q[0] = mocap.q[0];
 	mocap_odom.q[1] = mocap.q[1];
 	mocap_odom.q[2] = mocap.q[2];
 	mocap_odom.q[3] = mocap.q[3];
 
-	const size_t URT_SIZE = sizeof(mocap_odom.pose_covariance) / sizeof(mocap_odom.pose_covariance[0]);
-	static_assert(URT_SIZE == (sizeof(mocap.covariance) / sizeof(mocap.covariance[0])),
-		      "Odometry Pose Covariance matrix URT array size mismatch");
+	// const size_t URT_SIZE = sizeof(mocap_odom.pose_covariance) / sizeof(mocap_odom.pose_covariance[0]);
+	// static_assert(URT_SIZE == (sizeof(mocap.covariance) / sizeof(mocap.covariance[0])),
+	// 	      "Odometry Pose Covariance matrix URT array size mismatch");
 
-	for (size_t i = 0; i < URT_SIZE; i++) {
-		mocap_odom.pose_covariance[i] = mocap.covariance[i];
-	}
+	// for (size_t i = 0; i < URT_SIZE; i++) {
+	// 	mocap_odom.pose_covariance[i] = mocap.covariance[i];
+	// }
 
 	mocap_odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-	mocap_odom.vx = NAN;
-	mocap_odom.vy = NAN;
-	mocap_odom.vz = NAN;
-	mocap_odom.rollspeed = NAN;
-	mocap_odom.pitchspeed = NAN;
-	mocap_odom.yawspeed = NAN;
+	mocap_odom.velocity[0] = NAN;
+	mocap_odom.velocity[1] = NAN;
+	mocap_odom.velocity[2] = NAN;
+	mocap_odom.angular_velocity[0] = NAN;
+	mocap_odom.angular_velocity[1] = NAN;
+	mocap_odom.angular_velocity[2] = NAN;
 	mocap_odom.velocity_covariance[0] = NAN;
 
 	_mocap_odometry_pub.publish(mocap_odom);
@@ -1321,29 +1322,30 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 	visual_odom.timestamp = hrt_absolute_time();
 	visual_odom.timestamp_sample = _mavlink_timesync.sync_stamp(ev.usec);
 
-	visual_odom.x = ev.x;
-	visual_odom.y = ev.y;
-	visual_odom.z = ev.z;
+	visual_odom.position[0] = ev.x;
+	visual_odom.position[1] = ev.y;
+	visual_odom.position[2] = ev.z;
+
 	matrix::Quatf q(matrix::Eulerf(ev.roll, ev.pitch, ev.yaw));
 	q.copyTo(visual_odom.q);
 
 	visual_odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
-	const size_t URT_SIZE = sizeof(visual_odom.pose_covariance) / sizeof(visual_odom.pose_covariance[0]);
-	static_assert(URT_SIZE == (sizeof(ev.covariance) / sizeof(ev.covariance[0])),
-		      "Odometry Pose Covariance matrix URT array size mismatch");
+	// const size_t URT_SIZE = sizeof(visual_odom.pose_covariance) / sizeof(visual_odom.pose_covariance[0]);
+	// static_assert(URT_SIZE == (sizeof(ev.covariance) / sizeof(ev.covariance[0])),
+	// 	      "Odometry Pose Covariance matrix URT array size mismatch");
 
-	for (size_t i = 0; i < URT_SIZE; i++) {
-		visual_odom.pose_covariance[i] = ev.covariance[i];
-	}
+	// for (size_t i = 0; i < URT_SIZE; i++) {
+	// 	visual_odom.pose_covariance[i] = ev.covariance[i];
+	// }
 
 	visual_odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-	visual_odom.vx = NAN;
-	visual_odom.vy = NAN;
-	visual_odom.vz = NAN;
-	visual_odom.rollspeed = NAN;
-	visual_odom.pitchspeed = NAN;
-	visual_odom.yawspeed = NAN;
+	visual_odom.velocity[0] = NAN;
+	visual_odom.velocity[1] = NAN;
+	visual_odom.velocity[2] = NAN;
+	visual_odom.angular_velocity[0] = NAN;
+	visual_odom.angular_velocity[1] = NAN;
+	visual_odom.angular_velocity[2] = NAN;
 	visual_odom.velocity_covariance[0] = NAN;
 
 	visual_odom.reset_counter = ev.reset_counter;
@@ -1354,102 +1356,279 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 {
-	mavlink_odometry_t odom;
-	mavlink_msg_odometry_decode(msg, &odom);
-
-	vehicle_odometry_s odometry{};
-
-	odometry.timestamp = hrt_absolute_time();
-	odometry.timestamp_sample = _mavlink_timesync.sync_stamp(odom.time_usec);
-
-	/* The position is in a local FRD frame */
-	odometry.x = odom.x;
-	odometry.y = odom.y;
-	odometry.z = odom.z;
-
-	/**
-	 * The quaternion of the ODOMETRY msg represents a rotation from body frame
-	 * to a local frame
-	 */
-	matrix::Quatf q_body_to_local(odom.q);
-	q_body_to_local.normalize();
-	q_body_to_local.copyTo(odometry.q);
+	mavlink_odometry_t mavlink_odometry;
+	mavlink_msg_odometry_decode(msg, &mavlink_odometry);
 
 	// pose_covariance
-	static constexpr size_t POS_URT_SIZE = sizeof(odometry.pose_covariance) / sizeof(odometry.pose_covariance[0]);
-	static_assert(POS_URT_SIZE == (sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0])),
-		      "Odometry Pose Covariance matrix URT array size mismatch");
+	//  Row-major representation of a 6x6 pose cross-covariance matrix upper right triangle (states: x, y, z, roll, pitch, yaw)
+	//  first six entries are the first ROW, next five entries are the second ROW, etc.
+	// static constexpr size_t POS_URT_SIZE = sizeof(odometry.pose_covariance) / sizeof(odometry.pose_covariance[0]);
+	// static_assert(POS_URT_SIZE == (sizeof(mavlink_odometry.pose_covariance) / sizeof(mavlink_odometry.pose_covariance[0])),
+	// 	      "Odometry Pose Covariance matrix URT array size mismatch");
 
 	// velocity_covariance
-	static constexpr size_t VEL_URT_SIZE = sizeof(odometry.velocity_covariance) / sizeof(odometry.velocity_covariance[0]);
-	static_assert(VEL_URT_SIZE == (sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0])),
-		      "Odometry Velocity Covariance matrix URT array size mismatch");
+	//  Row-major representation of a 6x6 velocity cross-covariance matrix upper right triangle (states: vx, vy, vz, rollspeed, pitchspeed, yawspeed)
+	//  first six entries are the first ROW, next five entries are the second ROW, etc.
+	// static constexpr size_t VEL_URT_SIZE = sizeof(odometry.velocity_covariance) / sizeof(odometry.velocity_covariance[0]);
+	// static_assert(VEL_URT_SIZE == (sizeof(mavlink_odometry.velocity_covariance) / sizeof(
+	// 				       mavlink_odometry.velocity_covariance[0])), "Odometry Velocity Covariance matrix URT array size mismatch");
 
-	// TODO: create a method to simplify covariance copy
-	for (size_t i = 0; i < POS_URT_SIZE; i++) {
-		odometry.pose_covariance[i] = odom.pose_covariance[i];
+	vehicle_odometry_s odometry;
+	odometry.timestamp_sample = _mavlink_timesync.sync_stamp(mavlink_odometry.time_usec);
+
+	// initialize all fields to invalid
+	odometry.local_frame = vehicle_odometry_s::FRAME_UNKNOWN;
+	odometry.position[0] = NAN;
+	odometry.position[1] = NAN;
+	odometry.position[2] = NAN;
+
+	for (auto &pc : odometry.position_covariance) {
+		pc = NAN;
 	}
 
-	/**
-	 * PX4 expects the body's linear velocity in the local frame,
-	 * the linear velocity is rotated from the odom child_frame to the
-	 * local NED frame. The angular velocity needs to be expressed in the
-	 * body (fcu_frd) frame.
-	 */
-	if (odom.child_frame_id == MAV_FRAME_BODY_FRD) {
+	odometry.q[0] = NAN;
+	odometry.q[1] = NAN;
+	odometry.q[2] = NAN;
+	odometry.q[3] = NAN;
+	odometry.q_offset[0] = NAN;
+	odometry.q_offset[1] = NAN;
+	odometry.q_offset[2] = NAN;
+	odometry.q_offset[3] = NAN;
 
-		odometry.velocity_frame = vehicle_odometry_s::BODY_FRAME_FRD;
-		odometry.vx = odom.vx;
-		odometry.vy = odom.vy;
-		odometry.vz = odom.vz;
+	odometry.velocity_frame = vehicle_odometry_s::FRAME_UNKNOWN;
+	odometry.velocity[0] = NAN;
+	odometry.velocity[1] = NAN;
+	odometry.velocity[2] = NAN;
 
-		odometry.rollspeed = odom.rollspeed;
-		odometry.pitchspeed = odom.pitchspeed;
-		odometry.yawspeed = odom.yawspeed;
-
-		for (size_t i = 0; i < VEL_URT_SIZE; i++) {
-			odometry.velocity_covariance[i] = odom.velocity_covariance[i];
-		}
-
-	} else {
-		PX4_ERR("Body frame %" PRIu8 " not supported. Unable to publish velocity", odom.child_frame_id);
+	for (auto &vc : odometry.velocity_covariance) {
+		vc = NAN;
 	}
 
-	odometry.reset_counter = odom.reset_counter;
+	odometry.angular_velocity[0] = NAN;
+	odometry.angular_velocity[1] = NAN;
+	odometry.angular_velocity[2] = NAN;
 
-	/**
-	 * Supported local frame of reference is MAV_FRAME_LOCAL_NED or MAV_FRAME_LOCAL_FRD
-	 * The supported sources of the data/tesimator type are MAV_ESTIMATOR_TYPE_VISION,
-	 * MAV_ESTIMATOR_TYPE_VIO and MAV_ESTIMATOR_TYPE_MOCAP
-	 *
-	 * @note Regarding the local frames of reference, the appropriate EKF_AID_MASK
-	 * should be set in order to match a frame aligned (NED) or not aligned (FRD)
-	 * with true North
-	 */
-	if (odom.frame_id == MAV_FRAME_LOCAL_NED || odom.frame_id == MAV_FRAME_LOCAL_FRD) {
-
-		if (odom.frame_id == MAV_FRAME_LOCAL_NED) {
+	// position x/y/z (m)
+	if (PX4_ISFINITE(mavlink_odometry.x) && PX4_ISFINITE(mavlink_odometry.y) && PX4_ISFINITE(mavlink_odometry.z)) {
+		// frame_id: Coordinate frame of reference for the pose data.
+		switch (mavlink_odometry.frame_id) {
+		case MAV_FRAME_LOCAL_NED:
+			// NED local tangent frame (x: North, y: East, z: Down) with origin fixed relative to earth.
 			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+			odometry.position[0] = mavlink_odometry.x;
+			odometry.position[1] = mavlink_odometry.y;
+			odometry.position[2] = mavlink_odometry.z;
+			break;
 
-		} else {
+		case MAV_FRAME_LOCAL_ENU:
+			// ENU local tangent frame (x: East, y: North, z: Up) with origin fixed relative to earth.
+			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+			odometry.position[0] =  mavlink_odometry.y; // y: North
+			odometry.position[1] =  mavlink_odometry.x; // x: East
+			odometry.position[2] = -mavlink_odometry.z; // z: Up
+			break;
+
+		case MAV_FRAME_LOCAL_FRD:
+			// FRD local tangent frame (x: Forward, y: Right, z: Down) with origin fixed relative to earth.
 			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+			odometry.position[0] = mavlink_odometry.x;
+			odometry.position[1] = mavlink_odometry.y;
+			odometry.position[2] = mavlink_odometry.z;
+			break;
+
+		case MAV_FRAME_LOCAL_FLU:
+			// FLU local tangent frame (x: Forward, y: Left, z: Up) with origin fixed relative to earth.
+			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+			odometry.position[0] =  mavlink_odometry.x; // x: Forward
+			odometry.position[1] = -mavlink_odometry.y; // y: Left
+			odometry.position[2] = -mavlink_odometry.z; // z: Up
+			break;
+
+		default:
+			break;
 		}
 
-		if ((odom.estimator_type == MAV_ESTIMATOR_TYPE_VISION)
-		    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_VIO)
-		    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_UNKNOWN)) {
-			// accept MAV_ESTIMATOR_TYPE_UNKNOWN for legacy support
-			_visual_odometry_pub.publish(odometry);
+		// pose_covariance
+		//  Row-major representation of a 6x6 pose cross-covariance matrix upper right triangle (states: x, y, z, roll, pitch, yaw)
+		//  first six entries are the first ROW, next five entries are the second ROW, etc.
+		if (mavlink_odometry.estimator_type != MAV_ESTIMATOR_TYPE_NAIVE) {
+			switch (mavlink_odometry.frame_id) {
+			case MAV_FRAME_LOCAL_NED:
+			case MAV_FRAME_LOCAL_FRD:
+			case MAV_FRAME_LOCAL_FLU:
+				// position covariances copied directly
+				odometry.position_covariance[0] = mavlink_odometry.pose_covariance[0];  // X  row 0, col 0
+				odometry.position_covariance[1] = mavlink_odometry.pose_covariance[1];  // XY row 0, col 1
+				odometry.position_covariance[2] = mavlink_odometry.pose_covariance[2];  // XZ row 0, col 2
+				odometry.position_covariance[3] = mavlink_odometry.pose_covariance[6];  // Y  row 1, col 1
+				odometry.position_covariance[4] = mavlink_odometry.pose_covariance[7];  // YZ row 1, col 2
+				odometry.position_covariance[5] = mavlink_odometry.pose_covariance[11]; // Z  row 2, col 2
+				break;
 
-		} else if (odom.estimator_type == MAV_ESTIMATOR_TYPE_MOCAP) {
-			_mocap_odometry_pub.publish(odometry);
+			case MAV_FRAME_LOCAL_ENU:
+				// ENU local tangent frame (x: East, y: North, z: Up) with origin fixed relative to earth.
+				odometry.position_covariance[0] = mavlink_odometry.pose_covariance[6];  // Y  row 1, col 1
+				odometry.position_covariance[1] = mavlink_odometry.pose_covariance[1];  // XY row 0, col 1
+				odometry.position_covariance[2] = mavlink_odometry.pose_covariance[7];  // YZ row 1, col 2
+				odometry.position_covariance[3] = mavlink_odometry.pose_covariance[0];  // X  row 0, col 0
+				odometry.position_covariance[4] = mavlink_odometry.pose_covariance[2];  // XZ row 0, col 2
+				odometry.position_covariance[5] = mavlink_odometry.pose_covariance[11]; // Z  row 2, col 2
+				break;
 
-		} else {
-			PX4_ERR("Estimator source %" PRIu8 " not supported. Unable to publish pose and velocity", odom.estimator_type);
+			default:
+				break;
+			}
+		}
+	}
+
+	// q: the quaternion of the ODOMETRY msg represents a rotation from body frame to a local frame
+	if (PX4_ISFINITE(mavlink_odometry.q[0])
+	    && PX4_ISFINITE(mavlink_odometry.q[1])
+	    && PX4_ISFINITE(mavlink_odometry.q[2])
+	    && PX4_ISFINITE(mavlink_odometry.q[3])) {
+
+		matrix::Quatf q_body_to_local(mavlink_odometry.q);
+		q_body_to_local.normalize();
+		q_body_to_local.copyTo(odometry.q);
+
+		// pose_covariance (roll, pitch, yaw)
+		//  states: x, y, z, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.
+		//  TODO: fix pose_covariance for MAV_FRAME_LOCAL_ENU, MAV_FRAME_LOCAL_FLU
+		if (mavlink_odometry.estimator_type != MAV_ESTIMATOR_TYPE_NAIVE) {
+			odometry.orientation_covariance[0] = mavlink_odometry.pose_covariance[15]; // R  row 3, col 3
+			odometry.orientation_covariance[1] = mavlink_odometry.pose_covariance[16]; // RP row 3, col 4
+			odometry.orientation_covariance[2] = mavlink_odometry.pose_covariance[17]; // RY row 3, col 5
+			odometry.orientation_covariance[3] = mavlink_odometry.pose_covariance[18]; // P  row 4, col 4
+			odometry.orientation_covariance[4] = mavlink_odometry.pose_covariance[19]; // PY row 4, col 5
+			odometry.orientation_covariance[5] = mavlink_odometry.pose_covariance[20]; // Y  row 5, col 5
+		}
+	}
+
+	// velocity vx/vy/vz (m/s)
+	if (PX4_ISFINITE(mavlink_odometry.vx) && PX4_ISFINITE(mavlink_odometry.vy) && PX4_ISFINITE(mavlink_odometry.vz)) {
+		// child_frame_id: Coordinate frame of reference for the velocity in free space (twist) data.
+		switch (mavlink_odometry.child_frame_id) {
+		case MAV_FRAME_LOCAL_NED:
+			// NED local tangent frame (x: North, y: East, z: Down) with origin fixed relative to earth.
+			odometry.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+			odometry.velocity[0] = mavlink_odometry.vx;
+			odometry.velocity[1] = mavlink_odometry.vy;
+			odometry.velocity[2] = mavlink_odometry.vz;
+			break;
+
+		case MAV_FRAME_LOCAL_ENU:
+			// ENU local tangent frame (x: East, y: North, z: Up) with origin fixed relative to earth.
+			odometry.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+			odometry.velocity[0] =  mavlink_odometry.vy; // y: North
+			odometry.velocity[1] =  mavlink_odometry.vx; // x: East
+			odometry.velocity[2] = -mavlink_odometry.vz; // z: Up
+			break;
+
+		case MAV_FRAME_LOCAL_FRD:
+			// FRD local tangent frame (x: Forward, y: Right, z: Down) with origin fixed relative to earth.
+			odometry.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+			odometry.velocity[0] = mavlink_odometry.vx;
+			odometry.velocity[1] = mavlink_odometry.vy;
+			odometry.velocity[2] = mavlink_odometry.vz;
+			break;
+
+		case MAV_FRAME_LOCAL_FLU:
+			// FLU local tangent frame (x: Forward, y: Left, z: Up) with origin fixed relative to earth.
+			odometry.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+			odometry.velocity[0] =  mavlink_odometry.vx; // x: Forward
+			odometry.velocity[1] = -mavlink_odometry.vy; // y: Left
+			odometry.velocity[2] = -mavlink_odometry.vz; // z: Up
+			break;
+
+		case MAV_FRAME_BODY_NED: // DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+		case MAV_FRAME_BODY_OFFSET_NED: // DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+		case MAV_FRAME_BODY_FRD:
+			// FRD local tangent frame (x: Forward, y: Right, z: Down) with origin that travels with vehicle.
+			odometry.velocity_frame = vehicle_odometry_s::BODY_FRAME_FRD;
+			odometry.velocity[0] = mavlink_odometry.vx;
+			odometry.velocity[1] = mavlink_odometry.vy;
+			odometry.velocity[2] = mavlink_odometry.vz;
+			break;
+
+		default:
+			// unsupported child_frame_id
+			break;
 		}
 
-	} else {
-		PX4_ERR("Local frame %" PRIu8 " not supported. Unable to publish pose and velocity", odom.frame_id);
+		// velocity_covariance (vx, vy, vz)
+		//  states: vx, vy, vz, rollspeed, pitchspeed, yawspeed; first six entries are the first ROW, next five entries are the second ROW, etc.
+		//  TODO: fix velocity_covariance for MAV_FRAME_LOCAL_ENU, MAV_FRAME_LOCAL_FLU, MAV_FRAME_LOCAL_FLU
+		if (mavlink_odometry.estimator_type != MAV_ESTIMATOR_TYPE_NAIVE) {
+			switch (mavlink_odometry.child_frame_id) {
+			case MAV_FRAME_LOCAL_NED:
+			case MAV_FRAME_LOCAL_FRD:
+			case MAV_FRAME_LOCAL_FLU:
+			case MAV_FRAME_BODY_NED: // DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+			case MAV_FRAME_BODY_OFFSET_NED: // DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+			case MAV_FRAME_BODY_FRD:
+				// velocity covariances copied directly
+				odometry.velocity_covariance[0] = mavlink_odometry.velocity_covariance[0];  // X  row 0, col 0
+				odometry.velocity_covariance[1] = mavlink_odometry.velocity_covariance[1];  // XY row 0, col 1
+				odometry.velocity_covariance[2] = mavlink_odometry.velocity_covariance[2];  // XZ row 0, col 2
+				odometry.velocity_covariance[3] = mavlink_odometry.velocity_covariance[6];  // Y  row 1, col 1
+				odometry.velocity_covariance[4] = mavlink_odometry.velocity_covariance[7];  // YZ row 1, col 2
+				odometry.velocity_covariance[5] = mavlink_odometry.velocity_covariance[11]; // Z  row 2, col 2
+				break;
+
+			case MAV_FRAME_LOCAL_ENU:
+				// ENU local tangent frame (x: East, y: North, z: Up) with origin fixed relative to earth.
+				odometry.velocity_covariance[0] = mavlink_odometry.velocity_covariance[6];  // Y  row 1, col 1
+				odometry.velocity_covariance[1] = mavlink_odometry.velocity_covariance[1];  // XY row 0, col 1
+				odometry.velocity_covariance[2] = mavlink_odometry.velocity_covariance[7];  // YZ row 1, col 2
+				odometry.velocity_covariance[3] = mavlink_odometry.velocity_covariance[0];  // X  row 0, col 0
+				odometry.velocity_covariance[4] = mavlink_odometry.velocity_covariance[2];  // XZ row 0, col 2
+				odometry.velocity_covariance[5] = mavlink_odometry.velocity_covariance[11]; // Z  row 2, col 2
+				break;
+
+			default:
+				// unsupported child_frame_id
+				break;
+			}
+		}
+	}
+
+	// Roll/Pitch/Yaw angular speed (rad/s)
+	if (PX4_ISFINITE(mavlink_odometry.rollspeed)
+	    && PX4_ISFINITE(mavlink_odometry.pitchspeed)
+	    && PX4_ISFINITE(mavlink_odometry.yawspeed)) {
+
+		odometry.angular_velocity[0] = mavlink_odometry.rollspeed;
+		odometry.angular_velocity[1] = mavlink_odometry.pitchspeed;
+		odometry.angular_velocity[2] = mavlink_odometry.yawspeed;
+	}
+
+	odometry.reset_counter = mavlink_odometry.reset_counter;
+	odometry.quality = mavlink_odometry.quality;
+
+	switch (mavlink_odometry.estimator_type) {
+	case MAV_ESTIMATOR_TYPE_UNKNOWN: // accept MAV_ESTIMATOR_TYPE_UNKNOWN for legacy support
+	case MAV_ESTIMATOR_TYPE_NAIVE:
+	case MAV_ESTIMATOR_TYPE_VISION:
+	case MAV_ESTIMATOR_TYPE_VIO:
+		odometry.timestamp = hrt_absolute_time();
+		_visual_odometry_pub.publish(odometry);
+		break;
+
+	case MAV_ESTIMATOR_TYPE_MOCAP:
+		odometry.timestamp = hrt_absolute_time();
+		_mocap_odometry_pub.publish(odometry);
+		break;
+
+	case MAV_ESTIMATOR_TYPE_GPS:
+	case MAV_ESTIMATOR_TYPE_GPS_INS:
+	case MAV_ESTIMATOR_TYPE_LIDAR:
+	case MAV_ESTIMATOR_TYPE_AUTOPILOT:
+	default:
+		mavlink_log_critical(&_mavlink_log_pub, "ODOMETRY: estimator_type %" PRIu8 " unsupported\t",
+				     mavlink_odometry.estimator_type);
+		events::send<uint8_t>(events::ID("mavlink_rcv_odom_unsup_estimator_type"), events::Log::Error,
+				      "ODOMETRY: unsupported estimator_type {1}", mavlink_odometry.estimator_type);
+		return;
 	}
 }
 

@@ -99,9 +99,9 @@ private:
 			msg.child_frame_id = MAV_FRAME_BODY_FRD;
 
 			// Current position
-			msg.x = odom.x;
-			msg.y = odom.y;
-			msg.z = odom.z;
+			msg.x = odom.position[0];
+			msg.y = odom.position[1];
+			msg.z = odom.position[2];
 
 			// Current orientation
 			msg.q[0] = odom.q[0];
@@ -111,9 +111,9 @@ private:
 
 			switch (odom.velocity_frame) {
 			case vehicle_odometry_s::BODY_FRAME_FRD:
-				msg.vx = odom.vx;
-				msg.vy = odom.vy;
-				msg.vz = odom.vz;
+				msg.vx = odom.velocity[0];
+				msg.vy = odom.velocity[1];
+				msg.vz = odom.velocity[2];
 				break;
 
 			case vehicle_odometry_s::LOCAL_FRAME_FRD:
@@ -122,8 +122,7 @@ private:
 				const matrix::Dcmf R_body_to_local(matrix::Quatf(odom.q));
 
 				// Rotate linear velocity from local to body frame
-				const matrix::Vector3f linvel_body(R_body_to_local.transpose() *
-								   matrix::Vector3f(odom.vx, odom.vy, odom.vz));
+				const matrix::Vector3f linvel_body(R_body_to_local.transpose() * matrix::Vector3f(odom.velocity));
 
 				msg.vx = linvel_body(0);
 				msg.vy = linvel_body(1);
@@ -132,34 +131,35 @@ private:
 			}
 
 			// Current body rates
-			msg.rollspeed = odom.rollspeed;
-			msg.pitchspeed = odom.pitchspeed;
-			msg.yawspeed = odom.yawspeed;
+			msg.rollspeed = odom.angular_velocity[0];
+			msg.pitchspeed = odom.angular_velocity[1];
+			msg.yawspeed = odom.angular_velocity[2];
 
 			// get the covariance matrix size
 
 			// pose_covariance
-			static constexpr size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
-			static_assert(POS_URT_SIZE == (sizeof(msg.pose_covariance) / sizeof(msg.pose_covariance[0])),
-				      "Odometry Pose Covariance matrix URT array size mismatch");
+			// static constexpr size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
+			// static_assert(POS_URT_SIZE == (sizeof(msg.pose_covariance) / sizeof(msg.pose_covariance[0])),
+			// 	      "Odometry Pose Covariance matrix URT array size mismatch");
 
-			// velocity_covariance
-			static constexpr size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
-			static_assert(VEL_URT_SIZE == (sizeof(msg.velocity_covariance) / sizeof(msg.velocity_covariance[0])),
-				      "Odometry Velocity Covariance matrix URT array size mismatch");
+			// // velocity_covariance
+			// static constexpr size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
+			// static_assert(VEL_URT_SIZE == (sizeof(msg.velocity_covariance) / sizeof(msg.velocity_covariance[0])),
+			// 	      "Odometry Velocity Covariance matrix URT array size mismatch");
 
 			// copy pose covariances
-			for (size_t i = 0; i < POS_URT_SIZE; i++) {
-				msg.pose_covariance[i] = odom.pose_covariance[i];
-			}
+			// for (size_t i = 0; i < POS_URT_SIZE; i++) {
+			// 	msg.pose_covariance[i] = odom.pose_covariance[i];
+			// }
 
 			// copy velocity covariances
 			//TODO: Apply rotation matrix to transform from body-fixed NED to earth-fixed NED frame
-			for (size_t i = 0; i < VEL_URT_SIZE; i++) {
-				msg.velocity_covariance[i] = odom.velocity_covariance[i];
-			}
+			// for (size_t i = 0; i < VEL_URT_SIZE; i++) {
+			// 	msg.velocity_covariance[i] = odom.velocity_covariance[i];
+			// }
 
 			msg.reset_counter = odom.reset_counter;
+			msg.quality = odom.quality;
 
 			mavlink_msg_odometry_send_struct(_mavlink->get_channel(), &msg);
 

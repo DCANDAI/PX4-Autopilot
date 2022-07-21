@@ -1367,16 +1367,14 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 	odom.timestamp = timestamp;
 	odom.timestamp_sample = timestamp;
 
-	const size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
-
 	if (odom_mavlink->msgid == MAVLINK_MSG_ID_ODOMETRY) {
 		mavlink_odometry_t odom_msg;
 		mavlink_msg_odometry_decode(odom_mavlink, &odom_msg);
 
 		/* The position in the local NED frame */
-		odom.x = odom_msg.x;
-		odom.y = odom_msg.y;
-		odom.z = odom_msg.z;
+		odom.position[0] = odom_msg.x;
+		odom.position[1] = odom_msg.y;
+		odom.position[2] = odom_msg.z;
 
 		/* The quaternion of the ODOMETRY msg represents a rotation from
 		 * NED earth/local frame to XYZ body frame */
@@ -1390,36 +1388,37 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 			odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
 		}
 
-		static_assert(POS_URT_SIZE == (sizeof(odom_msg.pose_covariance) / sizeof(odom_msg.pose_covariance[0])),
-			      "Odometry Pose Covariance matrix URT array size mismatch");
+		// static_assert(POS_URT_SIZE == (sizeof(odom_msg.pose_covariance) / sizeof(odom_msg.pose_covariance[0])),
+		// 	      "Odometry Pose Covariance matrix URT array size mismatch");
 
-		/* The pose covariance URT */
-		for (size_t i = 0; i < POS_URT_SIZE; i++) {
-			odom.pose_covariance[i] = odom_msg.pose_covariance[i];
-		}
+		// /* The pose covariance URT */
+		// for (size_t i = 0; i < POS_URT_SIZE; i++) {
+		// 	odom.pose_covariance[i] = odom_msg.pose_covariance[i];
+		// }
 
 		/* The velocity in the body-fixed frame */
 		odom.velocity_frame = vehicle_odometry_s::BODY_FRAME_FRD;
-		odom.vx = odom_msg.vx;
-		odom.vy = odom_msg.vy;
-		odom.vz = odom_msg.vz;
+		odom.velocity[0] = odom_msg.vx;
+		odom.velocity[1] = odom_msg.vy;
+		odom.velocity[2] = odom_msg.vz;
 
 		/* The angular velocity in the body-fixed frame */
-		odom.rollspeed = odom_msg.rollspeed;
-		odom.pitchspeed = odom_msg.pitchspeed;
-		odom.yawspeed = odom_msg.yawspeed;
+		odom.angular_velocity[0] = odom_msg.rollspeed;
+		odom.angular_velocity[1] = odom_msg.pitchspeed;
+		odom.angular_velocity[2] = odom_msg.yawspeed;
 
 		// velocity_covariance
-		static constexpr size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
-		static_assert(VEL_URT_SIZE == (sizeof(odom_msg.velocity_covariance) / sizeof(odom_msg.velocity_covariance[0])),
-			      "Odometry Velocity Covariance matrix URT array size mismatch");
+		// static constexpr size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
+		// static_assert(VEL_URT_SIZE == (sizeof(odom_msg.velocity_covariance) / sizeof(odom_msg.velocity_covariance[0])),
+		// 	      "Odometry Velocity Covariance matrix URT array size mismatch");
 
-		/* The velocity covariance URT */
-		for (size_t i = 0; i < VEL_URT_SIZE; i++) {
-			odom.velocity_covariance[i] = odom_msg.velocity_covariance[i];
-		}
+		// /* The velocity covariance URT */
+		// for (size_t i = 0; i < VEL_URT_SIZE; i++) {
+		// 	odom.velocity_covariance[i] = odom_msg.velocity_covariance[i];
+		// }
 
 		odom.reset_counter = odom_msg.reset_counter;
+		//odom.quality = odom_msg.quality;
 
 		/* Publish the odometry based on the source */
 		if (odom_msg.estimator_type == MAV_ESTIMATOR_TYPE_VISION || odom_msg.estimator_type == MAV_ESTIMATOR_TYPE_VIO) {
@@ -1436,9 +1435,9 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 		mavlink_vision_position_estimate_t ev;
 		mavlink_msg_vision_position_estimate_decode(odom_mavlink, &ev);
 		/* The position in the local NED frame */
-		odom.x = ev.x;
-		odom.y = ev.y;
-		odom.z = ev.z;
+		odom.position[0] = ev.x;
+		odom.position[1] = ev.y;
+		odom.position[2] = ev.z;
 		/* The euler angles of the VISUAL_POSITION_ESTIMATE msg represent a
 		 * rotation from NED earth/local frame to XYZ body frame */
 		matrix::Quatf q(matrix::Eulerf(ev.roll, ev.pitch, ev.yaw));
@@ -1446,22 +1445,23 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 
 		odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
-		static_assert(POS_URT_SIZE == (sizeof(ev.covariance) / sizeof(ev.covariance[0])),
-			      "Vision Position Estimate Pose Covariance matrix URT array size mismatch");
+		// static_assert(POS_URT_SIZE == (sizeof(ev.covariance) / sizeof(ev.covariance[0])),
+		// 	      "Vision Position Estimate Pose Covariance matrix URT array size mismatch");
 
-		/* The pose covariance URT */
-		for (size_t i = 0; i < POS_URT_SIZE; i++) {
-			odom.pose_covariance[i] = ev.covariance[i];
-		}
+		// /* The pose covariance URT */
+		// for (size_t i = 0; i < POS_URT_SIZE; i++) {
+		// 	odom.pose_covariance[i] = ev.covariance[i];
+		// }
 
 		/* The velocity in the local NED frame - unknown */
-		odom.vx = NAN;
-		odom.vy = NAN;
-		odom.vz = NAN;
+		odom.velocity[0] = NAN;
+		odom.velocity[1] = NAN;
+		odom.velocity[2] = NAN;
+
 		/* The angular velocity in body-fixed frame - unknown */
-		odom.rollspeed = NAN;
-		odom.pitchspeed = NAN;
-		odom.yawspeed = NAN;
+		odom.angular_velocity[0] = NAN;
+		odom.angular_velocity[1] = NAN;
+		odom.angular_velocity[2] = NAN;
 
 		/* The velocity covariance URT - unknown */
 		odom.velocity_covariance[0] = NAN;

@@ -50,8 +50,37 @@ void Ekf::controlGpsFusion()
 	if (_gps_data_ready) {
 
 		updateGpsYaw(_gps_sample_delayed);
-		updateGpsVel(_gps_sample_delayed);
-		updateGpsPos(_gps_sample_delayed);
+
+		const float vel_var = sq(_gps_sample_delayed.sacc);
+		const Vector3f vel_obs_var{vel_var, vel_var, vel_var * sq(1.5f)};
+		updateVelocity(_gps_sample_delayed.time_us, _gps_sample_delayed.vel, vel_obs_var, fmaxf(_params.gps_vel_innov_gate, 1.f), _aid_src_gnss_vel);
+
+		// GNSS position
+		Vector3f position;
+		position(0) = _gps_sample_delayed.pos(0);
+		position(1) = _gps_sample_delayed.pos(1);
+
+		// vertical position - gps measurement has opposite sign to earth z axis
+		position(2) = -(_gps_sample_delayed.hgt - getEkfGlobalOriginAltitude() - _gps_hgt_offset);
+
+		float pos_var = 0.f;
+
+		if (isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
+			// if we are using other sources of aiding, then relax the upper observation
+			// noise limit which prevents bad GPS perturbing the position estimate
+			float lower_limit = fmaxf(_params.gps_pos_noise, 0.01f);
+			pos_var = sq(fmaxf(_gps_sample_delayed.hacc, lower_limit));
+
+		} else {
+			// if we are not using another source of aiding, then we are reliant on the GPS
+			// observations to constrain attitude errors and must limit the observation noise value.
+			float lower_limit = fmaxf(_params.gps_pos_noise, 0.01f);
+			float upper_limit = fmaxf(_params.pos_noaid_noise, lower_limit);
+			pos_var = sq(math::constrain(_gps_sample_delayed.hacc, lower_limit, upper_limit));
+		}
+
+		const Vector3f pos_obs_var{pos_var, pos_var, getGpsHeightVariance()};
+		updatePosition(_gps_sample_delayed.time_us, position, pos_obs_var, fmaxf(_params.gps_pos_innov_gate, 1.f), _aid_src_gnss_pos);
 
 		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
 		const bool gps_checks_failing = isTimedOut(_last_gps_pass_us, (uint64_t)5e6);
@@ -72,8 +101,15 @@ void Ekf::controlGpsFusion()
 				if (continuing_conditions_passing
 				    || !isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 
-					fuseGpsVel();
-					fuseGpsPos();
+					_aid_src_gnss_vel.fusion_enabled[0] = true;
+					_aid_src_gnss_vel.fusion_enabled[1] = true;
+					_aid_src_gnss_vel.fusion_enabled[2] = true;
+					fuseVelocity(_aid_src_gnss_vel);
+
+					_aid_src_gnss_pos.fusion_enabled[0] = true;
+					_aid_src_gnss_pos.fusion_enabled[1] = true;
+					_aid_src_gnss_pos.fusion_enabled[2] = _control_status.flags.gps_hgt;
+					fusePosition(_aid_src_gnss_pos);
 
 					if (shouldResetGpsFusion()) {
 						const bool was_gps_signal_lost = isTimedOut(_time_prev_gps_us, 1000000);
@@ -112,12 +148,6 @@ void Ekf::controlGpsFusion()
 					stopGpsFusion();
 					_warning_events.flags.gps_quality_poor = true;
 					ECL_WARN("GPS quality poor - stopping use");
-
-					// TODO: move this to EV control logic
-					// Reset position state to external vision if we are going to use absolute values
-					if (_control_status.flags.ev_pos && !(_params.fusion_mode & SensorFusionMask::ROTATE_EXT_VIS)) {
-						resetHorizontalPositionToVision();
-					}
 				}
 
 			} else { // mandatory conditions are not passing
@@ -136,7 +166,6 @@ void Ekf::controlGpsFusion()
 
 					// Stop the vision for yaw fusion and do not allow it to start again
 					stopEvYawFusion();
-					_inhibit_ev_yaw_use = true;
 
 				} else {
 					startGpsFusion();

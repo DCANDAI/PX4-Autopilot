@@ -69,9 +69,9 @@ private:
 			msg.q[1] = mocap.q[1];
 			msg.q[2] = mocap.q[2];
 			msg.q[3] = mocap.q[3];
-			msg.x = mocap.x;
-			msg.y = mocap.y;
-			msg.z = mocap.z;
+			msg.x = mocap.position[0];
+			msg.y = mocap.position[1];
+			msg.z = mocap.position[2];
 			// msg.covariance =
 
 			mavlink_msg_att_pos_mocap_send_struct(_mavlink->get_channel(), &msg);

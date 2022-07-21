@@ -64,9 +64,14 @@ void Vio::setVelocityFrameToBody()
 	_vio_data.vel_frame = VelocityFrame::BODY_FRAME_FRD;
 }
 
-void Vio::setVelocityFrameToLocal()
+void Vio::setVelocityFrameToLocalFRD()
 {
 	_vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_FRD;
+}
+
+void Vio::setVelocityFrameToLocalNED()
+{
+	_vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_NED;
 }
 
 extVisionSample Vio::dataAtRest()

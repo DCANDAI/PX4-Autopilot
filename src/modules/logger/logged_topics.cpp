@@ -154,7 +154,6 @@ void LoggedTopics::add_default_topics()
 	add_topic("estimator_states", 1000);
 	add_topic("estimator_status", 200);
 	add_topic("estimator_status_flags", 0);
-	add_topic("estimator_visual_odometry_aligned", 200);
 	add_topic("yaw_estimator_status", 1000);
 
 	add_optional_topic_multi("estimator_baro_bias", 500, MAX_ESTIMATOR_INSTANCES);
@@ -168,7 +167,6 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic_multi("estimator_states", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_status", 200, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_status_flags", 0, MAX_ESTIMATOR_INSTANCES);
-	add_optional_topic_multi("estimator_visual_odometry_aligned", 200, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("yaw_estimator_status", 1000, MAX_ESTIMATOR_INSTANCES);
 
 	// add_optional_topic_multi("estimator_aid_src_airspeed", 100, MAX_ESTIMATOR_INSTANCES);
@@ -250,7 +248,6 @@ void LoggedTopics::add_default_topics()
 	add_topic("estimator_states");
 	add_topic("estimator_status");
 	add_topic("estimator_status_flags");
-	add_topic("estimator_visual_odometry_aligned");
 	add_topic("vehicle_attitude");
 	add_topic("vehicle_global_position");
 	add_topic("vehicle_local_position");
@@ -261,6 +258,9 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic_multi("estimator_aid_src_baro_hgt", 0, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_aid_src_rng_hgt", 0, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_aid_src_fake_pos", 0, MAX_ESTIMATOR_INSTANCES);
+	add_optional_topic_multi("estimator_aid_src_ev_yaw", 0, MAX_ESTIMATOR_INSTANCES);
+	add_optional_topic_multi("estimator_aid_src_ev_vel", 0, MAX_ESTIMATOR_INSTANCES);
+	add_optional_topic_multi("estimator_aid_src_ev_pos", 0, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_aid_src_gnss_yaw", 0, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_aid_src_gnss_vel", 0, MAX_ESTIMATOR_INSTANCES);
 	add_optional_topic_multi("estimator_aid_src_gnss_pos", 0, MAX_ESTIMATOR_INSTANCES);

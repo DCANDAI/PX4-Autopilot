@@ -90,9 +90,6 @@ public:
 	bool isIntendingMag3DFusion() const;
 	void setMagFuseTypeNone();
 
-	void enableExternalVisionAlignment();
-	void disableExternalVisionAlignment();
-
 	bool isWindVelocityEstimated() const;
 
 	void enableTerrainRngFusion();

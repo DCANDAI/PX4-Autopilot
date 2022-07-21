@@ -618,7 +618,7 @@ PARAM_DEFINE_FLOAT(EKF2_TAS_GATE, 3.0f);
  * @bit 3 vision position fusion
  * @bit 4 vision yaw fusion
  * @bit 5 multi-rotor drag fusion
- * @bit 6 rotate external vision
+ * @bit 6 unused
  * @bit 7 GPS yaw fusion
  * @bit 8 vision velocity fusion
  * @reboot_required true
@@ -720,6 +720,16 @@ PARAM_DEFINE_FLOAT(EKF2_MIN_RNG, 0.1f);
  * @group EKF2
  */
 PARAM_DEFINE_INT32(EKF2_EV_NOISE_MD, 0);
+
+/**
+ * Vision minimum quality
+ *
+ * @group EKF2
+ * @min 0
+ * @max 100
+ * @decimal 1
+ */
+PARAM_DEFINE_INT32(EKF2_EV_QMIN, 0);
 
 /**
  * Measurement noise for vision position observations used to lower bound or replace the uncertainty included in the message

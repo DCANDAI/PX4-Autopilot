@@ -33,7 +33,6 @@
 
 /**
  * @file vel_pos_fusion.cpp
- * Function for fusing gps and baro measurements/
  *
  * @author Roman Bast <bapstroman@gmail.com>
  * @author Siddharth Bharat Purohit <siddharthbharatpurohit@gmail.com>
@@ -44,118 +43,98 @@
 #include <mathlib/mathlib.h>
 #include "ekf.h"
 
-bool Ekf::fuseHorizontalVelocity(const Vector3f &innov, const float innov_gate, const Vector3f &obs_var,
-				 Vector3f &innov_var, Vector2f &test_ratio)
+void Ekf::updateVelocity(const uint64_t& sample_time_us, const Vector3f& velocity, const Vector3f& obs_var, const float innov_gate, estimator_aid_source_3d_s& vel_aid_src)
 {
-	innov_var(0) = P(4, 4) + obs_var(0);
-	innov_var(1) = P(5, 5) + obs_var(1);
-	test_ratio(0) = fmaxf(sq(innov(0)) / (sq(innov_gate) * innov_var(0)),
-			      sq(innov(1)) / (sq(innov_gate) * innov_var(1)));
+	resetEstimatorAidStatus(vel_aid_src);
 
-	const bool innov_check_pass = (test_ratio(0) <= 1.0f);
+	for (int i = 0; i < 3; i++) {
+		vel_aid_src.observation[i] = velocity(i);
+		vel_aid_src.observation_variance[i] = obs_var(i);
 
-	if (innov_check_pass) {
-		_innov_check_fail_status.flags.reject_hor_vel = false;
-
-		bool fuse_vx = fuseVelPosHeight(innov(0), innov_var(0), 0);
-		bool fuse_vy = fuseVelPosHeight(innov(1), innov_var(1), 1);
-
-		return fuse_vx && fuse_vy;
-
-	} else {
-		_innov_check_fail_status.flags.reject_hor_vel = true;
-		return false;
+		vel_aid_src.innovation[i] = _state.vel(i) - velocity(i);
+		vel_aid_src.innovation_variance[i] = P(4 + i, 4 + i) + obs_var(i);
 	}
-}
 
-bool Ekf::fuseVerticalVelocity(const Vector3f &innov, const float innov_gate, const Vector3f &obs_var,
-			       Vector3f &innov_var, Vector2f &test_ratio)
-{
-	innov_var(2) = P(6, 6) + obs_var(2);
-	test_ratio(1) = sq(innov(2)) / (sq(innov_gate) * innov_var(2));
-	_vert_vel_innov_ratio = innov(2) / sqrtf(innov_var(2));
-	_vert_vel_fuse_time_us = _time_last_imu;
-	bool innov_check_pass = (test_ratio(1) <= 1.0f);
+	setEstimatorAidStatusTestRatio(vel_aid_src, innov_gate);
 
-	// if there is bad vertical acceleration data, then don't reject measurement,
+	// vz special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
-	float innovation;
-
-	if (_fault_status.flags.bad_acc_vertical && !innov_check_pass) {
-		const float innov_limit = innov_gate * sqrtf(innov_var(2));
-		innovation = math::constrain(innov(2), -innov_limit, innov_limit);
-		innov_check_pass = true;
-
-	} else {
-		innovation = innov(2);
+	if (_fault_status.flags.bad_acc_vertical && vel_aid_src.innovation_rejected[2]) {
+		const float innov_limit = innov_gate * sqrtf(vel_aid_src.innovation_variance[2]);
+		vel_aid_src.innovation[2] = math::constrain(vel_aid_src.innovation[2], -innov_limit, innov_limit);
+		vel_aid_src.innovation_rejected[2] = false;
 	}
 
-	if (innov_check_pass) {
-		_innov_check_fail_status.flags.reject_ver_vel = false;
-
-		return fuseVelPosHeight(innovation, innov_var(2), 2);
-
-	} else {
-		_innov_check_fail_status.flags.reject_ver_vel = true;
-		return false;
-	}
+	vel_aid_src.timestamp_sample = sample_time_us;
 }
 
-bool Ekf::fuseHorizontalPosition(const Vector3f &innov, const float innov_gate, const Vector3f &obs_var,
-				 Vector3f &innov_var, Vector2f &test_ratio)
+void Ekf::updatePosition(const uint64_t& sample_time_us, const Vector3f& position, const Vector3f& obs_var, const float innov_gate, estimator_aid_source_3d_s& pos_aid_src)
 {
+	resetEstimatorAidStatus(pos_aid_src);
 
-	innov_var(0) = P(7, 7) + obs_var(0);
-	innov_var(1) = P(8, 8) + obs_var(1);
-	test_ratio(0) = fmaxf(sq(innov(0)) / (sq(innov_gate) * innov_var(0)),
-			      sq(innov(1)) / (sq(innov_gate) * innov_var(1)));
+	for (int i = 0; i < 3; i++) {
+		pos_aid_src.observation[i] = position(i);
+		pos_aid_src.observation_variance[i] = obs_var(i);
 
-	const bool innov_check_pass = test_ratio(0) <= 1.0f;
-
-	if (innov_check_pass) {
-		_innov_check_fail_status.flags.reject_hor_pos = false;
-
-		bool fuse_x = fuseVelPosHeight(innov(0), innov_var(0), 3);
-		bool fuse_y = fuseVelPosHeight(innov(1), innov_var(1), 4);
-
-		return fuse_x && fuse_y;
-
-	} else {
-		_innov_check_fail_status.flags.reject_hor_pos = true;
-		return false;
+		pos_aid_src.innovation[i] = _state.pos(i) - position(i);
+		pos_aid_src.innovation_variance[i] = P(7 + i, 7 + i) + obs_var(i);
 	}
-}
 
-bool Ekf::fuseVerticalPosition(const float innov, const float innov_gate, const float obs_var,
-			       float &innov_var, float &test_ratio)
-{
-	innov_var = P(9, 9) + obs_var;
-	test_ratio = sq(innov) / (sq(innov_gate) * innov_var);
-	_vert_pos_innov_ratio = innov / sqrtf(innov_var);
-	_vert_pos_fuse_attempt_time_us = _time_last_imu;
-	bool innov_check_pass = test_ratio <= 1.0f;
+	setEstimatorAidStatusTestRatio(pos_aid_src, innov_gate);
 
-	// if there is bad vertical acceleration data, then don't reject measurement,
+	// z special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
-	float innovation;
-
-	if (_fault_status.flags.bad_acc_vertical && !innov_check_pass) {
-		const float innov_limit = innov_gate * sqrtf(innov_var);
-		innovation = math::constrain(innov, -innov_limit, innov_limit);
-		innov_check_pass = true;
-
-	} else {
-		innovation = innov;
+	if (_fault_status.flags.bad_acc_vertical && pos_aid_src.innovation_rejected[2]) {
+		const float innov_limit = innov_gate * sqrtf(pos_aid_src.innovation_variance[2]);
+		pos_aid_src.innovation[2] = math::constrain(pos_aid_src.innovation[2], -innov_limit, innov_limit);
+		pos_aid_src.innovation_rejected[2] = false;
 	}
 
-	if (innov_check_pass) {
-		_innov_check_fail_status.flags.reject_ver_pos = false;
+	pos_aid_src.timestamp_sample = sample_time_us;
+}
 
-		return fuseVelPosHeight(innovation, innov_var, 5);
+void Ekf::fuseVelocity(estimator_aid_source_3d_s& vel_aid_src)
+{
+	// vx & vy
+	if (vel_aid_src.fusion_enabled[0] && vel_aid_src.fusion_enabled[1] &&
+		!vel_aid_src.innovation_rejected[0] && !vel_aid_src.innovation_rejected[1]) {
+		for (int i = 0; i < 2; i++) {
+			if (fuseVelPosHeight(vel_aid_src.innovation[i], vel_aid_src.innovation_variance[i], i)) {
+				vel_aid_src.fused[i] = true;
+				vel_aid_src.time_last_fuse[i] = _time_last_imu;
+			}
+		}
+	}
 
-	} else {
-		_innov_check_fail_status.flags.reject_ver_pos = true;
-		return false;
+	// vz
+	if (vel_aid_src.fusion_enabled[2] && !vel_aid_src.innovation_rejected[2]) {
+		if (fuseVelPosHeight(vel_aid_src.innovation[2], vel_aid_src.innovation_variance[2], 2)) {
+			vel_aid_src.fused[2] = true;
+			vel_aid_src.time_last_fuse[2] = _time_last_imu;
+		}
+	}
+}
+
+void Ekf::fusePosition(estimator_aid_source_3d_s& pos_aid_src)
+{
+	// x & y
+	if (pos_aid_src.fusion_enabled[0] && !pos_aid_src.innovation_rejected[0]
+	 && pos_aid_src.fusion_enabled[1] && !pos_aid_src.innovation_rejected[1]
+	) {
+		for (int i = 0; i < 2; i++) {
+			if (fuseVelPosHeight(pos_aid_src.innovation[i], pos_aid_src.innovation_variance[i], 3 + i)) {
+				pos_aid_src.fused[i] = true;
+				pos_aid_src.time_last_fuse[i] = _time_last_imu;
+			}
+		}
+	}
+
+	// z
+	if (pos_aid_src.fusion_enabled[2] && !pos_aid_src.innovation_rejected[2]) {
+		if (fuseVelPosHeight(pos_aid_src.innovation[2], pos_aid_src.innovation_variance[2], 5)) {
+			pos_aid_src.fused[2] = true;
+			pos_aid_src.time_last_fuse[2] = _time_last_imu;
+		}
 	}
 }
 

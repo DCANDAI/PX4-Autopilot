@@ -145,7 +145,6 @@ private:
 	void PublishInnovationVariances(const hrt_abstime &timestamp);
 	void PublishLocalPosition(const hrt_abstime &timestamp);
 	void PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu);
-	void PublishOdometryAligned(const hrt_abstime &timestamp, const vehicle_odometry_s &ev_odom);
 	void PublishOpticalFlowVel(const hrt_abstime &timestamp);
 	void PublishSensorBias(const hrt_abstime &timestamp);
 	void PublishStates(const hrt_abstime &timestamp);
@@ -157,7 +156,7 @@ private:
 	void UpdateAirspeedSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateAuxVelSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateBaroSample(ekf2_timestamps_s &ekf2_timestamps);
-	bool UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps, vehicle_odometry_s &ev_odom);
+	bool UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps);
 	bool UpdateFlowSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateMagSample(ekf2_timestamps_s &ekf2_timestamps);
@@ -258,6 +257,8 @@ private:
 	hrt_abstime _status_fake_pos_pub_last{0};
 
 	hrt_abstime _status_ev_yaw_pub_last{0};
+	hrt_abstime _status_ev_vel_pub_last{0};
+	hrt_abstime _status_ev_pos_pub_last{0};
 
 	hrt_abstime _status_gnss_yaw_pub_last{0};
 	hrt_abstime _status_gnss_vel_pub_last{0};
@@ -266,7 +267,10 @@ private:
 	hrt_abstime _status_mag_pub_last{0};
 	hrt_abstime _status_mag_heading_pub_last{0};
 
-	float _last_baro_bias_published{};
+	hrt_abstime _status_aux_vel_pub_last{0};
+
+	float _last_baro_gnss_bias_published{};
+	float _last_baro_ev_bias_published{};
 
 	float _airspeed_scale_factor{1.0f}; ///< scale factor correction applied to airspeed measurements
 	hrt_abstime _airspeed_validated_timestamp_last{0};
@@ -320,7 +324,6 @@ private:
 	uORB::PublicationMulti<estimator_states_s>           _estimator_states_pub{ORB_ID(estimator_states)};
 	uORB::PublicationMulti<estimator_status_flags_s>     _estimator_status_flags_pub{ORB_ID(estimator_status_flags)};
 	uORB::PublicationMulti<estimator_status_s>           _estimator_status_pub{ORB_ID(estimator_status)};
-	uORB::PublicationMulti<vehicle_odometry_s>           _estimator_visual_odometry_aligned_pub{ORB_ID(estimator_visual_odometry_aligned)};
 	uORB::PublicationMulti<vehicle_optical_flow_vel_s> _estimator_optical_flow_vel_pub{ORB_ID(estimator_optical_flow_vel)};
 	uORB::PublicationMulti<yaw_estimator_status_s>       _yaw_est_pub{ORB_ID(yaw_estimator_status)};
 
@@ -330,6 +333,10 @@ private:
 
 	uORB::PublicationMulti<estimator_aid_source_2d_s> _estimator_aid_src_fake_pos_pub{ORB_ID(estimator_aid_src_fake_pos)};
 
+	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_ev_yaw_pub{ORB_ID(estimator_aid_src_ev_yaw)};
+	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_ev_vel_pub{ORB_ID(estimator_aid_src_ev_vel)};
+	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_ev_pos_pub{ORB_ID(estimator_aid_src_ev_pos)};
+
 	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_gnss_yaw_pub{ORB_ID(estimator_aid_src_gnss_yaw)};
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_gnss_vel_pub{ORB_ID(estimator_aid_src_gnss_vel)};
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_gnss_pos_pub{ORB_ID(estimator_aid_src_gnss_pos)};
@@ -337,8 +344,7 @@ private:
 	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_mag_heading_pub{ORB_ID(estimator_aid_src_mag_heading)};
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_mag_pub{ORB_ID(estimator_aid_src_mag)};
 
-	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_ev_yaw_pub{ORB_ID(estimator_aid_src_ev_yaw)};
-
+	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_aux_vel_pub{ORB_ID(estimator_aid_src_aux_vel)};
 
 	// publications with topic dependent on multi-mode
 	uORB::PublicationMulti<vehicle_attitude_s>           _attitude_pub;
@@ -483,6 +489,7 @@ private:
 		// vision estimate fusion
 		(ParamInt<px4::params::EKF2_EV_NOISE_MD>)
 		_param_ekf2_ev_noise_md,	///< determine source of vision observation noise
+		(ParamExtInt<px4::params::EKF2_EV_QMIN>) _param_ekf2_ev_qmin,
 		(ParamFloat<px4::params::EKF2_EVP_NOISE>)
 		_param_ekf2_evp_noise,	///< default position observation noise for exernal vision measurements (m)
 		(ParamFloat<px4::params::EKF2_EVV_NOISE>)

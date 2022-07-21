@@ -344,6 +344,9 @@ void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
 		ev_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_ext_vision_buffer->push(ev_sample_new);
+
+	} else {
+		ECL_ERR("EV data too fast %" PRIu64, evdata.time_us - _time_last_ext_vision);
 	}
 }
 

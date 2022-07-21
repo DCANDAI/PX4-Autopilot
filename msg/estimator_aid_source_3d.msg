@@ -19,4 +19,6 @@ bool[3] innovation_rejected  # true if the observation has been rejected
 bool[3] fused                # true if the sample was successfully fused
 
 # TOPICS estimator_aid_source_3d
-# TOPICS estimator_aid_src_gnss_pos estimator_aid_src_gnss_vel estimator_aid_src_mag
+# TOPICS estimator_aid_src_ev_vel estimator_aid_src_ev_pos
+# TOPICS estimator_aid_src_gnss_vel estimator_aid_src_gnss_pos
+# TOPICS estimator_aid_src_mag estimator_aid_src_aux_vel

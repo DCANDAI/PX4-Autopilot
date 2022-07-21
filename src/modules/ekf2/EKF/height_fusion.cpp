@@ -50,7 +50,7 @@ void Ekf::updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s
 	float obs_var = sq(fmaxf(_params.baro_noise, 0.01f));
 
 	// vertical position innovation - baro measurement has opposite sign to earth z axis
-	baro_hgt.observation = -(_baro_sample_delayed.hgt - _baro_b_est.getBias() - _baro_hgt_offset);
+	baro_hgt.observation = -(_baro_sample_delayed.hgt - _baro_gnss_bias_est.getBias() - _baro_hgt_offset);
 	baro_hgt.observation_variance = obs_var;
 
 	baro_hgt.innovation = _state.pos(2) - baro_hgt.observation;
@@ -141,20 +141,4 @@ void Ekf::fuseRngHgt(estimator_aid_source_1d_s &rng_hgt)
 		rng_hgt.fused = true;
 		rng_hgt.time_last_fuse = _time_last_imu;
 	}
-}
-
-void Ekf::fuseEvHgt()
-{
-	// calculate the innovation assuming the external vision observation is in local NED frame
-	_ev_pos_innov(2) = _state.pos(2) - _ev_sample_delayed.pos(2);
-
-	// innovation gate size
-	float innov_gate = fmaxf(_params.ev_pos_innov_gate, 1.f);
-
-	// observation variance - defined externally
-	float obs_var = fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f));
-
-	// _ev_pos_test_ratio(1) is the vertical test ratio
-	fuseVerticalPosition(_ev_pos_innov(2), innov_gate, obs_var,
-			     _ev_pos_innov_var(2), _ev_pos_test_ratio(1));
 }

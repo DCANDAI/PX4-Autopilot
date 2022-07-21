@@ -145,16 +145,6 @@ bool EkfWrapper::isIntendingExternalVisionHeadingFusion() const
 	return _ekf->control_status_flags().ev_yaw;
 }
 
-void EkfWrapper::enableExternalVisionAlignment()
-{
-	_ekf_params->fusion_mode |= SensorFusionMask::ROTATE_EXT_VIS;
-}
-
-void EkfWrapper::disableExternalVisionAlignment()
-{
-	_ekf_params->fusion_mode &= ~SensorFusionMask::ROTATE_EXT_VIS;
-}
-
 bool EkfWrapper::isIntendingMagHeadingFusion() const
 {
 	return _ekf->control_status_flags().mag_hdg;
